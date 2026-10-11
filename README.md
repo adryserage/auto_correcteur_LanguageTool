@@ -18,11 +18,26 @@
   <img src="./demo-auto-correct.gif" alt="AutoCorrect Demo" width="700" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/adryserage/auto_correcteur_LanguageTool/releases/latest">
+    <img src="https://img.shields.io/badge/⬇️_Download_Extension-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Download">
+  </a>
+</p>
+
+---
+
+## 📦 Install
+
+1. Download `autocorrect-vX.Y.Z.zip` from the [latest release](https://github.com/adryserage/auto_correcteur_LanguageTool/releases/latest) and unzip it
+2. Open `chrome://extensions` and turn on **Developer mode**
+3. Click **Load unpacked** and select the unzipped folder
+4. Open the extension popup and enter your server URL under **Serveur LanguageTool** (see [API](#-api))
+
 ---
 
 ## ✨ Features
 
-🔍 **Real-time Detection** — Automatically detects spelling and grammar errors as you type
+🔍 **Real-time Detection** — Automatically detects spelling and grammar errors as you type or paste
 
 🎯 **Smart Underlines** — Visual indicators with color coding:
 
@@ -50,17 +65,18 @@
 ## 🎯 How It Works
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                                                         │
-│   You type: "Je vais au marche aujourdui"              │
-│                      ~~~~~~~  ~~~~~~~~~                 │
-│                         │         │                     │
-│                         ▼         ▼                     │
-│                     [marché]  [aujourd'hui]             │
-│                                                         │
-│   Click the underline → See suggestions → Apply fix    │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│   You type: "Je vais au marche aujourdui"             [✓ 2]  │
+│                         ~~~~~~ ~~~~~~~~~                     │
+│                           │        │                         │
+│                           ▼        ▼                         │
+│                     [marché]      [aujourd'hui]              │
+│                                                              │
+│   One error:  click the underline → pick a suggestion        │
+│   All errors: click [✓ 2] → "Je vais au marché aujourd'hui"  │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 1. **Detection** — The extension monitors text fields on any webpage, including fields it only notices when you focus or type in them
@@ -137,6 +153,18 @@ npm run lint
 3. Click **Load unpacked** and select the `dist/` folder
 
 Each build renames the files in `dist/`. Click ↻ (Reload) on the extension after every build, otherwise pages log `ERR_FILE_NOT_FOUND` and nothing gets checked.
+
+### Release
+
+1. Set the same version in `package.json`, `package-lock.json` and `public/manifest.json` (`npm version X.Y.Z --no-git-tag-version` updates the first two) and merge it to `main`
+2. Tag the merge commit and push the tag:
+
+```bash
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+The Release workflow builds `dist/`, zips it as `autocorrect-vX.Y.Z.zip` and publishes a GitHub release with generated notes.
 
 ### Project Structure
 
