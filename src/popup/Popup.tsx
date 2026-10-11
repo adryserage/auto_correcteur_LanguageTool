@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Settings, DEFAULT_SETTINGS, COMMON_RULES } from '../shared/types'
 import { getSettings, setSettings, removeFromDictionary, onSettingsChange } from '../shared/storage'
 import { checkConnection } from '../content/language-tool-client'
+import { normalizeApiUrl, originPattern } from '../shared/api-url'
 
 // ════════════════════════════════════════════════════════════════════════════
 // ICONS
@@ -263,6 +264,122 @@ function DictionarySection({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SERVER URL SECTION COMPONENT
+// ════════════════════════════════════════════════════════════════════════════
+
+function ServerSection({
+  apiUrl,
+  onSave,
+}: {
+  apiUrl: string
+  onSave: (apiUrl: string) => Promise<void>
+}) {
+  const [value, setValue] = useState(apiUrl)
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Sync input when settings load or change elsewhere
+  useEffect(() => {
+    setValue(apiUrl)
+  }, [apiUrl])
+
+  async function save(input: string) {
+    const normalized = normalizeApiUrl(input)
+    if (!normalized) {
+      setStatus({ ok: false, text: 'URL invalide (ex. https://mon-serveur.com)' })
+      return
+    }
+
+    setSaving(true)
+    // Custom servers need a host permission so the popup can reach them
+    const granted = await chrome.permissions
+      .request({ origins: [originPattern(normalized)] })
+      .catch(() => false)
+    if (!granted) {
+      setStatus({ ok: false, text: 'Permission refusee pour ce domaine' })
+      setSaving(false)
+      return
+    }
+
+    setValue(normalized)
+    await onSave(normalized)
+    setStatus({ ok: true, text: 'Enregistre' })
+    setSaving(false)
+  }
+
+  return (
+    <div
+      className="px-4 py-3 rounded-xl"
+      style={{
+        background: 'var(--ac-paper)',
+        border: '1px solid var(--ac-border-soft)',
+      }}
+    >
+      <label className="text-xs font-medium mb-2 block" style={{ color: 'var(--ac-ink-muted)' }}>
+        Serveur LanguageTool
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          type="url"
+          value={value}
+          placeholder="https://mon-serveur.com"
+          spellCheck={false}
+          onChange={(e) => {
+            setValue(e.target.value)
+            setStatus(null)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save(value)
+          }}
+          className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm outline-none"
+          style={{
+            background: 'var(--ac-border-soft)',
+            border: '1px solid var(--ac-border)',
+            color: 'var(--ac-ink)',
+          }}
+        />
+        <button
+          onClick={() => save(value)}
+          disabled={saving}
+          className="px-3 py-2 rounded-lg text-sm font-medium transition-opacity"
+          style={{
+            background: 'var(--ac-ink)',
+            color: 'var(--ac-cream)',
+            opacity: saving ? 0.5 : 1,
+          }}
+        >
+          Enregistrer
+        </button>
+      </div>
+      <div className="flex items-center justify-between mt-2">
+        <span
+          className="text-xs"
+          style={{
+            color: status
+              ? status.ok
+                ? 'var(--ac-sage)'
+                : 'var(--ac-coral)'
+              : 'var(--ac-ink-muted)',
+          }}
+        >
+          {status ? status.text : 'Sans /v2 a la fin'}
+        </span>
+        {apiUrl !== DEFAULT_SETTINGS.apiUrl && (
+          <button
+            onClick={() => save(DEFAULT_SETTINGS.apiUrl)}
+            disabled={saving}
+            className="text-xs underline"
+            style={{ color: 'var(--ac-ink-muted)' }}
+          >
+            Par defaut
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -565,6 +682,12 @@ export function Popup() {
     setLocalSettings(updated)
   }
 
+  async function handleApiUrlChange(apiUrl: string) {
+    const updated = await setSettings({ apiUrl })
+    setLocalSettings(updated)
+    checkConnectionStatus()
+  }
+
   const languageOptions = [
     { value: 'auto' as const, label: 'Auto', flag: <FlagAuto /> },
     { value: 'fr' as const, label: 'Francais', flag: <FlagFR /> },
@@ -759,6 +882,11 @@ export function Popup() {
           onCheckLevelChange={handleCheckLevelChange}
           onRuleToggle={handleRuleToggle}
         />
+
+        {/* ─────────────────────────────────────────────────────────────────────
+            SERVER URL
+            ───────────────────────────────────────────────────────────────────── */}
+        <ServerSection apiUrl={settings.apiUrl} onSave={handleApiUrlChange} />
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
