@@ -477,8 +477,47 @@ export function init(): void {
   setTimeout(scanForFields, 2000)
   setTimeout(scanForFields, 5000)
 
+  // Catch fields the scans skipped (mounted late, or too small when mounted)
+  setupLazyAttach()
+
   // Listen for messages from popup
   setupMessageListener()
+}
+
+let lazyAttachInstalled = false
+
+/**
+ * Attach to any editable field the user focuses or types in.
+ * SPA editors (e.g. ProseMirror on claude.ai) often mount after the timed
+ * scans and start one line tall, so the size check in isEditableElement
+ * rejects them and nothing re-checks once they grow.
+ */
+function setupLazyAttach(): void {
+  if (lazyAttachInstalled) return
+  lazyAttachInstalled = true
+
+  const handler = (event: Event) => {
+    if (!currentSettings?.enabled) return
+
+    if (!(event.target instanceof HTMLElement)) return
+    let target: HTMLElement = event.target
+
+    if (target instanceof HTMLInputElement) {
+      const type = target.type.toLowerCase()
+      if (!['text', 'search', 'email', 'url', 'tel', ''].includes(type)) return
+    } else if (!(target instanceof HTMLTextAreaElement)) {
+      if (!target.isContentEditable) return
+      // Walk up to the editing host so we manage the whole editor, not a <p>
+      while (target.parentElement?.isContentEditable) {
+        target = target.parentElement
+      }
+    }
+
+    attachToField(target)
+  }
+
+  document.addEventListener('focusin', handler, true)
+  document.addEventListener('input', handler, true)
 }
 
 function setupMessageListener(): void {

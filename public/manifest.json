@@ -9,6 +9,7 @@
     "128": "icons/icon128.png"
   },
   "permissions": ["storage", "activeTab"],
+  "optional_host_permissions": ["*://*/*"],
   "host_permissions": [
     "*://*.zendesk.com/*",
     "*://*.fly.dev/*",
@@ -28,7 +29,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.zendesk.com/*"],
+      "matches": ["<all_urls>"],
       "js": ["src/content/index.ts"],
       "run_at": "document_idle",
       "all_frames": true
