@@ -11,6 +11,7 @@ interface ManagedField {
   debounceTimer: number | null
   lastText: string
   currentMatches: LanguageToolMatch[]
+  contentObserver: MutationObserver | null
 }
 
 const DEBOUNCE_MS = 400
@@ -332,6 +333,7 @@ function attachToField(element: HTMLInputElement | HTMLTextAreaElement | HTMLEle
     debounceTimer: null,
     lastText: '',
     currentMatches: [],
+    contentObserver: null,
   }
 
   // Initialize renderer with callbacks
@@ -353,6 +355,20 @@ function attachToField(element: HTMLInputElement | HTMLTextAreaElement | HTMLEle
   }
 
   managedFields.set(element, field)
+
+  // Rich editors like ProseMirror (claude.ai) handle paste themselves and
+  // update the DOM without firing an input event, so watch the content too.
+  // handleInput skips the check when the text has not changed.
+  if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
+    field.contentObserver = new MutationObserver(() => {
+      debounce(() => handleInput(field), DEBOUNCE_MS, field)
+    })
+    field.contentObserver.observe(element, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    })
+  }
 
   // Listen for input events
   element.addEventListener('input', () => {
@@ -393,6 +409,7 @@ function detachFromField(element: Element): void {
     if (field.debounceTimer !== null) {
       clearTimeout(field.debounceTimer)
     }
+    field.contentObserver?.disconnect()
     field.renderer.destroy()
     managedFields.delete(element)
   }
