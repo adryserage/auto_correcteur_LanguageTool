@@ -869,7 +869,6 @@ export class UnderlineRenderer {
       // Calculate character offsets
       const lines = text.split('\n')
       let startOffset = 0
-      let endOffset = text.length
 
       // Sum lengths of lines before visible area
       for (let i = 0; i < firstVisibleLine && i < lines.length; i++) {
@@ -881,7 +880,7 @@ export class UnderlineRenderer {
       for (let i = 0; i <= lastVisibleLine && i < lines.length; i++) {
         currentOffset += lines[i].length + 1
       }
-      endOffset = Math.min(currentOffset, text.length)
+      const endOffset = Math.min(currentOffset, text.length)
 
       return { startOffset, endOffset }
     }
