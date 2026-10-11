@@ -337,7 +337,7 @@ function RulesSection({
 
   // Filter rules based on language
   const relevantRules = COMMON_RULES.filter(
-    (rule) => language === 'auto' || rule.languages.includes(language)
+    (rule) => language === 'auto' || (rule.languages as readonly string[]).includes(language)
   )
 
   return (
@@ -509,15 +509,6 @@ export function Popup() {
   const [checking, setChecking] = useState(false)
   const [languageOpen, setLanguageOpen] = useState(false)
 
-  useEffect(() => {
-    getSettings().then(setLocalSettings)
-    checkConnectionStatus()
-
-    // Listen for settings changes (e.g., from tooltip adding words)
-    const unsubscribe = onSettingsChange(setLocalSettings)
-    return unsubscribe
-  }, [])
-
   const checkConnectionStatus = useCallback(async () => {
     setChecking(true)
     const currentSettings = await getSettings()
@@ -525,6 +516,15 @@ export function Popup() {
     setConnected(isConnected)
     setChecking(false)
   }, [])
+
+  useEffect(() => {
+    getSettings().then(setLocalSettings)
+    checkConnectionStatus()
+
+    // Listen for settings changes (e.g., from tooltip adding words)
+    const unsubscribe = onSettingsChange(setLocalSettings)
+    return unsubscribe
+  }, [checkConnectionStatus])
 
   async function handleToggle() {
     const newEnabled = !settings.enabled

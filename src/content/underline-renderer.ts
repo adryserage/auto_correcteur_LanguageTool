@@ -704,7 +704,6 @@ export class UnderlineRenderer {
 
     const positions = this.calculatePositions(visibleMatches, text)
 
-    let renderedCount = 0
     positions.forEach((pos) => {
       const match = visibleMatches[pos.matchIndex]
       if (!match) return // Safety check
@@ -732,7 +731,6 @@ export class UnderlineRenderer {
       })
 
       this.shadowRoot!.appendChild(underline)
-      renderedCount++
     })
   }
 
