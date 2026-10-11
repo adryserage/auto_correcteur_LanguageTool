@@ -704,7 +704,6 @@ export class UnderlineRenderer {
 
     const positions = this.calculatePositions(visibleMatches, text)
 
-    let renderedCount = 0
     positions.forEach((pos) => {
       const match = visibleMatches[pos.matchIndex]
       if (!match) return // Safety check
@@ -732,7 +731,6 @@ export class UnderlineRenderer {
       })
 
       this.shadowRoot!.appendChild(underline)
-      renderedCount++
     })
   }
 
@@ -871,7 +869,6 @@ export class UnderlineRenderer {
       // Calculate character offsets
       const lines = text.split('\n')
       let startOffset = 0
-      let endOffset = text.length
 
       // Sum lengths of lines before visible area
       for (let i = 0; i < firstVisibleLine && i < lines.length; i++) {
@@ -883,7 +880,7 @@ export class UnderlineRenderer {
       for (let i = 0; i <= lastVisibleLine && i < lines.length; i++) {
         currentOffset += lines[i].length + 1
       }
-      endOffset = Math.min(currentOffset, text.length)
+      const endOffset = Math.min(currentOffset, text.length)
 
       return { startOffset, endOffset }
     }
