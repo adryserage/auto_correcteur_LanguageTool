@@ -27,7 +27,4 @@ export interface SuggestionAppliedMessage {
 }
 
 export type Message =
-  | GetMatchesMessage
-  | MatchesResponseMessage
-  | ApplySuggestionMessage
-  | SuggestionAppliedMessage
+  GetMatchesMessage | MatchesResponseMessage | ApplySuggestionMessage | SuggestionAppliedMessage

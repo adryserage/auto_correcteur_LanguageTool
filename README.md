@@ -156,8 +156,8 @@ auto-correct/
 ├── tests/
 │   ├── unit/                 # Vitest tests
 │   └── e2e/                  # Playwright tests
-├── dist/                     # Built extension
-└── docker/                   # LanguageTool server config
+├── scripts/                  # Release script
+└── dist/                     # Built extension (not committed)
 ```
 
 ---
@@ -166,7 +166,7 @@ auto-correct/
 
 The extension uses [LanguageTool](https://languagetool.org/) for grammar checking.
 
-**Default server:** `https://grammar-rs-autocorrect.fly.dev`
+**Default server:** `https://grammar-rs-autocorrect.fly.dev`. This host no longer resolves, so set your own server in the popup.
 
 ### Custom server
 
@@ -179,16 +179,12 @@ Open the popup, enter your server URL under **Serveur LanguageTool**, and click 
 
 The extension already has access to all sites (`<all_urls>`), so any server works without an extra permission.
 
-### Self-hosting
+### Which server to use
 
-You can self-host your own LanguageTool server using the provided Docker configuration:
+Any server that speaks the LanguageTool HTTP API (`/v2/check`, `/v2/languages`) works:
 
-```bash
-cd docker
-fly launch  # Deploy to Fly.io
-```
-
-Or use the official LanguageTool API at `https://api.languagetool.org`
+- a self-hosted [LanguageTool HTTP server](https://dev.languagetool.org/http-server), for example on Railway or in Docker
+- the public LanguageTool API at `https://api.languagetool.org` (rate limited)
 
 ---
 

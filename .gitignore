@@ -1,8 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build output (use the zip for distribution)
-# dist/
+# Build output
+dist/
 
 # IDE
 .idea/
@@ -25,8 +25,3 @@ npm-debug.log*
 # Environment
 .env
 .env.local
-dist/**
-docker/load-tests/results/**
-
-# Grammar-RS N-gram data (31GB+ downloaded at runtime)
-grammar-rs/data/ngrams/
