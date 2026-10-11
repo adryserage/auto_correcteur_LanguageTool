@@ -377,40 +377,57 @@ export class UnderlineRenderer {
         height: 14px;
       }
 
-      /* "Fix all" pill, bottom-right inside the field */
+      /* "Fix all" icon, bottom-right inside the field */
       .fix-all-btn {
         position: absolute;
-        right: 6px;
+        right: 4px;
         bottom: 4px;
         display: none;
         align-items: center;
-        gap: 4px;
-        height: 22px;
-        padding: 0 8px;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        padding: 0;
         border: none;
-        border-radius: 11px;
+        border-radius: 50%;
         background: var(--ac-ink);
         color: var(--ac-cream);
-        font: 500 11px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         cursor: pointer;
         pointer-events: auto;
-        opacity: 0.85;
+        opacity: 0.7;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-        transition: opacity 0.15s ease;
+        transition: opacity 0.15s ease, transform 0.15s ease;
       }
       .fix-all-btn.visible {
         display: inline-flex;
       }
       .fix-all-btn:hover {
         opacity: 1;
+        transform: scale(1.1);
       }
       .fix-all-btn:disabled {
-        opacity: 0.5;
+        opacity: 0.4;
         cursor: default;
+        transform: none;
       }
       .fix-all-btn svg {
         width: 12px;
         height: 12px;
+      }
+      /* Error count badge on the top-right of the icon */
+      .fix-all-count {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        min-width: 13px;
+        height: 13px;
+        padding: 0 3px;
+        box-sizing: border-box;
+        border-radius: 7px;
+        background: var(--ac-coral);
+        color: #fff;
+        font: 600 9px/13px 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        text-align: center;
       }
     `
     this.shadowRoot.appendChild(style)
@@ -879,7 +896,6 @@ export class UnderlineRenderer {
     const button = document.createElement('button')
     button.className = 'fix-all-btn'
     button.type = 'button'
-    button.title = 'Appliquer la premiere suggestion pour chaque faute'
 
     // Keep focus and selection in the field
     button.addEventListener('mousedown', (e) => e.preventDefault())
@@ -904,9 +920,11 @@ export class UnderlineRenderer {
 
     this.fixAllButton.disabled = false
     this.fixAllButton.classList.toggle('visible', count > 0)
+    this.fixAllButton.title = `Tout corriger (${count})`
+    this.fixAllButton.setAttribute('aria-label', `Tout corriger (${count})`)
     this.fixAllButton.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-      Tout corriger (${count})
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      <span class="fix-all-count">${count}</span>
     `
   }
 
