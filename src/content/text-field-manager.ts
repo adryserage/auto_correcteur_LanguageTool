@@ -320,6 +320,58 @@ async function handleInput(field: ManagedField): Promise<void> {
   field.renderer.render(adjustedMatches, fullText)
 }
 
+/**
+ * Apply the first suggestion of every match.
+ * Matches are applied from the end of the text backwards so the offsets of
+ * the remaining ones stay valid. Overlapping matches are skipped.
+ */
+async function fixAll(
+  element: HTMLInputElement | HTMLTextAreaElement | HTMLElement,
+  matches: LanguageToolMatch[]
+): Promise<void> {
+  const fullText = getTextContent(element)
+  const edits: { offset: number; length: number; original: string; replacement: string }[] = []
+  let nextStart = Infinity
+
+  for (const match of [...matches].sort((a, b) => b.offset - a.offset)) {
+    const replacement = match.replacements[0]?.value
+    if (replacement === undefined) continue
+    if (match.offset + match.length > nextStart) continue
+    edits.push({
+      offset: match.offset,
+      length: match.length,
+      original: fullText.substring(match.offset, match.offset + match.length),
+      replacement,
+    })
+    nextStart = match.offset
+  }
+
+  if (edits.length === 0) return
+
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    // One value update and one input event for the whole batch
+    let text = element.value
+    for (const edit of edits) {
+      text =
+        text.substring(0, edit.offset) +
+        edit.replacement +
+        text.substring(edit.offset + edit.length)
+    }
+    element.value = text
+    element.dispatchEvent(new Event('input', { bubbles: true }))
+    return
+  }
+
+  // Contenteditable replacements go through the selection one at a time, and
+  // setTextContent applies each one asynchronously, so wait between edits
+  for (const edit of edits) {
+    const current = getTextContent(element).substring(edit.offset, edit.offset + edit.length)
+    if (current !== edit.original) continue
+    setTextContent(element, edit.offset, edit.length, edit.replacement)
+    await new Promise((resolve) => setTimeout(resolve, 60))
+  }
+}
+
 function attachToField(element: HTMLInputElement | HTMLTextAreaElement | HTMLElement): void {
   if (managedFields.has(element)) {
     return
@@ -346,6 +398,9 @@ function attachToField(element: HTMLInputElement | HTMLTextAreaElement | HTMLEle
       const text = getTextContent(element)
       const matchedText = text.substring(match.offset, match.offset + match.length)
       addToDictionary(matchedText)
+    },
+    onFixAll: (matches: LanguageToolMatch[]) => {
+      fixAll(element, matches)
     },
   })
 

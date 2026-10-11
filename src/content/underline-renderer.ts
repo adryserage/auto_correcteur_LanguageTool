@@ -17,6 +17,7 @@ interface VisibleRange {
 interface TooltipCallbacks {
   onReplace: (match: LanguageToolMatch, replacement: string) => void
   onIgnore: (match: LanguageToolMatch) => void
+  onFixAll?: (matches: LanguageToolMatch[]) => void
 }
 
 // Feature detection for CSS Custom Highlights API
@@ -36,6 +37,8 @@ export class UnderlineRenderer {
   private tooltipShadowRoot: ShadowRoot | null = null
   private resizeObserver: ResizeObserver | null = null
   private tooltip: HTMLDivElement | null = null
+  private fixAllButton: HTMLButtonElement | null = null
+  private fixableMatches: LanguageToolMatch[] = []
   private currentMatches: LanguageToolMatch[] = []
   private ignoredMatches: Set<string> = new Set()
   private personalDictionary: Set<string> = new Set()
@@ -373,8 +376,45 @@ export class UnderlineRenderer {
         width: 14px;
         height: 14px;
       }
+
+      /* "Fix all" pill, bottom-right inside the field */
+      .fix-all-btn {
+        position: absolute;
+        right: 6px;
+        bottom: 4px;
+        display: none;
+        align-items: center;
+        gap: 4px;
+        height: 22px;
+        padding: 0 8px;
+        border: none;
+        border-radius: 11px;
+        background: var(--ac-ink);
+        color: var(--ac-cream);
+        font: 500 11px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        cursor: pointer;
+        pointer-events: auto;
+        opacity: 0.85;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        transition: opacity 0.15s ease;
+      }
+      .fix-all-btn.visible {
+        display: inline-flex;
+      }
+      .fix-all-btn:hover {
+        opacity: 1;
+      }
+      .fix-all-btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .fix-all-btn svg {
+        width: 12px;
+        height: 12px;
+      }
     `
     this.shadowRoot.appendChild(style)
+    this.createFixAllButton()
 
     document.body.appendChild(this.overlay)
     this.updatePosition()
@@ -674,6 +714,8 @@ export class UnderlineRenderer {
       return true
     })
 
+    this.updateFixAllButton(activeMatches)
+
     if (activeMatches.length === 0) {
       this.clearHighlights()
       return
@@ -829,6 +871,43 @@ export class UnderlineRenderer {
 
       this.shadowRoot!.appendChild(target)
     })
+  }
+
+  private createFixAllButton(): void {
+    if (!this.shadowRoot) return
+
+    const button = document.createElement('button')
+    button.className = 'fix-all-btn'
+    button.type = 'button'
+    button.title = 'Appliquer la premiere suggestion pour chaque faute'
+
+    // Keep focus and selection in the field
+    button.addEventListener('mousedown', (e) => e.preventDefault())
+    button.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (this.fixableMatches.length === 0) return
+      button.disabled = true
+      this.hideTooltip()
+      this.callbacks?.onFixAll?.(this.fixableMatches)
+    })
+
+    this.shadowRoot.appendChild(button)
+    this.fixAllButton = button
+  }
+
+  private updateFixAllButton(activeMatches: LanguageToolMatch[]): void {
+    if (!this.fixAllButton) return
+
+    this.fixableMatches = activeMatches.filter((m) => m.replacements.length > 0)
+    const count = this.fixableMatches.length
+
+    this.fixAllButton.disabled = false
+    this.fixAllButton.classList.toggle('visible', count > 0)
+    this.fixAllButton.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      Tout corriger (${count})
+    `
   }
 
   private clearHighlights(): void {
