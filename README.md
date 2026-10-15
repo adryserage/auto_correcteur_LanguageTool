@@ -49,6 +49,8 @@
 
 🚀 **Fix All** — A round ✓ icon in the bottom-right corner of the field shows the error count. One click applies the first suggestion for every error.
 
+🔄 **Rephrase** — A second round icon, next to the ✓, rewrites the whole field with a small AI model you host. Ctrl+Z restores the original text.
+
 🌍 **Multi-language** — Supports French, English, and auto-detection
 
 🖧 **Your own server** — Point the extension at any LanguageTool-compatible server from the popup
@@ -102,6 +104,9 @@ Corrections are never applied without a click.
 │  Regles de verification       ▼     │
 │  Serveur LanguageTool               │
 │  [ https://mon-serveur.com ][Save]  │
+│  Serveur de reformulation (IA)      │
+│  [ https://mon-llm.com            ] │
+│  [ Cle API         ][Enregistrer]   │
 ├─────────────────────────────────────┤
 │  ● Connecte            ↻ Actualiser │
 └─────────────────────────────────────┘
@@ -112,6 +117,7 @@ Corrections are never applied without a click.
 - **Dictionnaire personnel** — Words added from the suggestion tooltip, removable here
 - **Regles de verification** — Strict mode and individual rules
 - **Serveur LanguageTool** — Custom server URL (see [API](#-api))
+- **Serveur de reformulation (IA)** — URL and API key of the rephrase server (see [Rephrase server](#rephrase-server)). Leave the URL empty to hide the icon
 - **Footer** — Connection status for the current server
 
 ---
@@ -213,6 +219,23 @@ Any server that speaks the LanguageTool HTTP API (`/v2/check`, `/v2/languages`) 
 
 - a self-hosted [LanguageTool HTTP server](https://dev.languagetool.org/http-server), for example on Railway or in Docker
 - the public LanguageTool API at `https://api.languagetool.org` (rate limited)
+
+### Rephrase server
+
+LanguageTool has no rephrase endpoint, so rephrasing goes to a separate server that speaks the OpenAI chat API (`/v1/chat/completions`). The extension sends the whole field (up to 3,000 characters) and replaces it with the answer.
+
+A small model on CPU is enough. Example with the [llama.cpp server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server) Docker image `ghcr.io/ggml-org/llama.cpp:server`, configured with environment variables:
+
+```
+LLAMA_ARG_HF_REPO=Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q4_K_M
+LLAMA_ARG_PORT=8080
+LLAMA_ARG_CTX_SIZE=4096
+LLAMA_ARG_THREADS=8          # match the container's vCPU limit
+LLAMA_API_KEY=<random key>   # paste the same key in the popup
+LLAMA_CACHE=/models          # mount a volume here so the model downloads once
+```
+
+Set the API key: without one, anyone who finds the URL can use your server. Ollama and other OpenAI-compatible servers work too.
 
 ---
 

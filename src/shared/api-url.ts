@@ -4,7 +4,19 @@
  * Returns null when the input is not a valid http(s) URL.
  */
 export function normalizeApiUrl(input: string): string | null {
-  const trimmed = input.trim().replace(/\/+$/, '').replace(/\/v2$/, '')
+  return normalizeUrl(input, /\/v2$/)
+}
+
+/**
+ * Normalize a user-entered rephrase server URL (OpenAI-compatible).
+ * The client appends `/v1/...` itself, so a trailing `/v1` is stripped.
+ */
+export function normalizeRephraseUrl(input: string): string | null {
+  return normalizeUrl(input, /\/v1$/)
+}
+
+function normalizeUrl(input: string, versionSuffix: RegExp): string | null {
+  const trimmed = input.trim().replace(/\/+$/, '').replace(versionSuffix, '')
 
   let url: URL
   try {

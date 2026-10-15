@@ -1,5 +1,6 @@
 import { Settings, LanguageToolMatch } from '../shared/types'
 import { checkText } from './language-tool-client'
+import { rephraseText, REPHRASE_MAX_LENGTH } from './rephrase-client'
 import { UnderlineRenderer } from './underline-renderer'
 import { findRangeInDOM } from './position-map'
 import { addToDictionary } from '../shared/storage'
@@ -28,13 +29,14 @@ export function setSettings(settings: Settings): void {
     document.querySelectorAll('.autocorrect-overlay').forEach((el) => el.remove())
   }
 
-  // Update dictionary for all managed fields
+  // Update dictionary and rephrase icon for all managed fields
   document
     .querySelectorAll('input, textarea, [contenteditable]:not([contenteditable="false"])')
     .forEach((el) => {
       const field = managedFields.get(el)
       if (field) {
         field.renderer.setDictionary(settings.personalDictionary || [])
+        field.renderer.setRephraseEnabled(Boolean(settings.rephraseUrl))
       }
     })
 }
@@ -372,6 +374,57 @@ async function fixAll(
   }
 }
 
+/**
+ * Replace the whole text of a field with one edit, so Ctrl+Z restores the
+ * original. Falls back to setting the value when execCommand is refused.
+ */
+function replaceAllText(
+  element: HTMLInputElement | HTMLTextAreaElement | HTMLElement,
+  text: string
+): void {
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    element.focus()
+    element.select()
+    if (!document.execCommand('insertText', false, text)) {
+      element.value = text
+      element.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    return
+  }
+
+  setTextContent(element, 0, getTextContent(element).length, text)
+}
+
+async function rephrase(field: ManagedField): Promise<void> {
+  if (!currentSettings?.rephraseUrl) return
+
+  const original = getTextContent(field.element)
+  if (original.length > REPHRASE_MAX_LENGTH) {
+    field.renderer.setRephraseLoading(false, `texte trop long (max ${REPHRASE_MAX_LENGTH})`)
+    return
+  }
+
+  field.renderer.setRephraseLoading(true)
+  try {
+    const rephrased = await rephraseText(
+      original,
+      currentSettings.language,
+      currentSettings.rephraseUrl,
+      currentSettings.rephraseApiKey
+    )
+    // Skip the edit if the user typed while the server was working
+    if (getTextContent(field.element) !== original) {
+      field.renderer.setRephraseLoading(false, 'le texte a change pendant la reformulation')
+      return
+    }
+    field.renderer.setRephraseLoading(false)
+    if (rephrased !== original) replaceAllText(field.element, rephrased)
+  } catch (error) {
+    console.error('[AutoCorrect] Rephrase error:', error)
+    field.renderer.setRephraseLoading(false, error instanceof Error ? error.message : 'erreur')
+  }
+}
+
 function attachToField(element: HTMLInputElement | HTMLTextAreaElement | HTMLElement): void {
   if (managedFields.has(element)) {
     return
@@ -402,12 +455,16 @@ function attachToField(element: HTMLInputElement | HTMLTextAreaElement | HTMLEle
     onFixAll: (matches: LanguageToolMatch[]) => {
       fixAll(element, matches)
     },
+    onRephrase: () => {
+      rephrase(field)
+    },
   })
 
   // Initialize dictionary from current settings
   if (currentSettings?.personalDictionary) {
     renderer.setDictionary(currentSettings.personalDictionary)
   }
+  renderer.setRephraseEnabled(Boolean(currentSettings?.rephraseUrl))
 
   managedFields.set(element, field)
 

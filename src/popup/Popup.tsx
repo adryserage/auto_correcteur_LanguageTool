@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Settings, DEFAULT_SETTINGS, COMMON_RULES } from '../shared/types'
 import { getSettings, setSettings, removeFromDictionary, onSettingsChange } from '../shared/storage'
 import { checkConnection } from '../content/language-tool-client'
-import { normalizeApiUrl, originPattern } from '../shared/api-url'
+import { checkRephraseConnection } from '../content/rephrase-client'
+import { normalizeApiUrl, normalizeRephraseUrl, originPattern } from '../shared/api-url'
 
 // ════════════════════════════════════════════════════════════════════════════
 // ICONS
@@ -385,6 +386,147 @@ function ServerSection({
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// REPHRASE SERVER SECTION COMPONENT
+// ════════════════════════════════════════════════════════════════════════════
+
+function RephraseSection({
+  rephraseUrl,
+  rephraseApiKey,
+  onSave,
+}: {
+  rephraseUrl: string
+  rephraseApiKey: string
+  onSave: (rephraseUrl: string, rephraseApiKey: string) => Promise<void>
+}) {
+  const [url, setUrl] = useState(rephraseUrl)
+  const [apiKey, setApiKey] = useState(rephraseApiKey)
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Sync inputs when settings load or change elsewhere
+  useEffect(() => {
+    setUrl(rephraseUrl)
+    setApiKey(rephraseApiKey)
+  }, [rephraseUrl, rephraseApiKey])
+
+  async function save() {
+    // An empty URL turns rephrasing off
+    if (url.trim() === '') {
+      setSaving(true)
+      await onSave('', apiKey.trim())
+      setStatus({ ok: true, text: 'Reformulation desactivee' })
+      setSaving(false)
+      return
+    }
+
+    const normalized = normalizeRephraseUrl(url)
+    if (!normalized) {
+      setStatus({ ok: false, text: 'URL invalide (ex. https://mon-llm.com)' })
+      return
+    }
+
+    setSaving(true)
+    const granted = await chrome.permissions
+      .request({ origins: [originPattern(normalized)] })
+      .catch(() => false)
+    if (!granted) {
+      setStatus({ ok: false, text: 'Permission refusee pour ce domaine' })
+      setSaving(false)
+      return
+    }
+
+    setUrl(normalized)
+    await onSave(normalized, apiKey.trim())
+    const reachable = await checkRephraseConnection(normalized)
+    setStatus(
+      reachable
+        ? { ok: true, text: 'Enregistre, serveur pret' }
+        : { ok: false, text: 'Enregistre, serveur injoignable ou en demarrage' }
+    )
+    setSaving(false)
+  }
+
+  const inputStyle = {
+    background: 'var(--ac-border-soft)',
+    border: '1px solid var(--ac-border)',
+    color: 'var(--ac-ink)',
+  }
+
+  return (
+    <div
+      className="px-4 py-3 rounded-xl"
+      style={{
+        background: 'var(--ac-paper)',
+        border: '1px solid var(--ac-border-soft)',
+      }}
+    >
+      <label className="text-xs font-medium mb-2 block" style={{ color: 'var(--ac-ink-muted)' }}>
+        Serveur de reformulation (IA)
+      </label>
+      <div className="flex flex-col gap-2">
+        <input
+          type="url"
+          value={url}
+          placeholder="https://mon-llm.com"
+          spellCheck={false}
+          onChange={(e) => {
+            setUrl(e.target.value)
+            setStatus(null)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save()
+          }}
+          className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+          style={inputStyle}
+        />
+        <div className="flex items-center gap-2">
+          <input
+            type="password"
+            value={apiKey}
+            placeholder="Cle API (optionnelle)"
+            spellCheck={false}
+            autoComplete="off"
+            onChange={(e) => {
+              setApiKey(e.target.value)
+              setStatus(null)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') save()
+            }}
+            className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm outline-none"
+            style={inputStyle}
+          />
+          <button
+            onClick={save}
+            disabled={saving}
+            className="px-3 py-2 rounded-lg text-sm font-medium transition-opacity"
+            style={{
+              background: 'var(--ac-ink)',
+              color: 'var(--ac-cream)',
+              opacity: saving ? 0.5 : 1,
+            }}
+          >
+            Enregistrer
+          </button>
+        </div>
+      </div>
+      <span
+        className="text-xs mt-2 block"
+        style={{
+          color: status
+            ? status.ok
+              ? 'var(--ac-sage)'
+              : 'var(--ac-coral)'
+            : 'var(--ac-ink-muted)',
+        }}
+      >
+        {status ? status.text : 'API compatible OpenAI, sans /v1 a la fin. Vide = desactive'}
+      </span>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // RULE TOGGLE ITEM COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -682,6 +824,11 @@ export function Popup() {
     setLocalSettings(updated)
   }
 
+  async function handleRephraseChange(rephraseUrl: string, rephraseApiKey: string) {
+    const updated = await setSettings({ rephraseUrl, rephraseApiKey })
+    setLocalSettings(updated)
+  }
+
   async function handleApiUrlChange(apiUrl: string) {
     const updated = await setSettings({ apiUrl })
     setLocalSettings(updated)
@@ -887,6 +1034,15 @@ export function Popup() {
             SERVER URL
             ───────────────────────────────────────────────────────────────────── */}
         <ServerSection apiUrl={settings.apiUrl} onSave={handleApiUrlChange} />
+
+        {/* ─────────────────────────────────────────────────────────────────────
+            REPHRASE SERVER
+            ───────────────────────────────────────────────────────────────────── */}
+        <RephraseSection
+          rephraseUrl={settings.rephraseUrl}
+          rephraseApiKey={settings.rephraseApiKey}
+          onSave={handleRephraseChange}
+        />
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
