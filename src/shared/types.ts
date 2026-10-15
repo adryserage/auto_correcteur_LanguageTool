@@ -39,6 +39,8 @@ export interface Settings {
   personalDictionary: string[]
   checkLevel: 'default' | 'picky'
   disabledRules: string[]
+  rephraseUrl: string
+  rephraseApiKey: string
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -48,6 +50,8 @@ export const DEFAULT_SETTINGS: Settings = {
   personalDictionary: [],
   checkLevel: 'default',
   disabledRules: [],
+  rephraseUrl: '',
+  rephraseApiKey: '',
 }
 
 // Common rules that users can toggle

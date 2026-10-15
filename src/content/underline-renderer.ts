@@ -1,5 +1,6 @@
 import { LanguageToolMatch } from '../shared/types'
 import { buildPositionMap, getPositionFromMap } from './position-map'
+import { REPHRASE_MIN_LENGTH } from './rephrase-client'
 
 interface TextPosition {
   x: number
@@ -18,6 +19,7 @@ interface TooltipCallbacks {
   onReplace: (match: LanguageToolMatch, replacement: string) => void
   onIgnore: (match: LanguageToolMatch) => void
   onFixAll?: (matches: LanguageToolMatch[]) => void
+  onRephrase?: () => void
 }
 
 // Feature detection for CSS Custom Highlights API
@@ -38,6 +40,9 @@ export class UnderlineRenderer {
   private resizeObserver: ResizeObserver | null = null
   private tooltip: HTMLDivElement | null = null
   private fixAllButton: HTMLButtonElement | null = null
+  private rephraseButton: HTMLButtonElement | null = null
+  private rephraseEnabled = false
+  private rephraseLoading = false
   private fixableMatches: LanguageToolMatch[] = []
   private currentMatches: LanguageToolMatch[] = []
   private ignoredMatches: Set<string> = new Set()
@@ -377,11 +382,18 @@ export class UnderlineRenderer {
         height: 14px;
       }
 
-      /* "Fix all" icon, bottom-right inside the field */
-      .fix-all-btn {
+      /* Field action icons (rephrase, fix all), bottom-right inside the field */
+      .field-actions {
         position: absolute;
         right: 4px;
         bottom: 4px;
+        display: flex;
+        gap: 6px;
+        pointer-events: none;
+      }
+      .fix-all-btn,
+      .rephrase-btn {
+        position: relative;
         display: none;
         align-items: center;
         justify-content: center;
@@ -398,21 +410,43 @@ export class UnderlineRenderer {
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
         transition: opacity 0.15s ease, transform 0.15s ease;
       }
-      .fix-all-btn.visible {
+      .fix-all-btn.visible,
+      .rephrase-btn.visible {
         display: inline-flex;
       }
-      .fix-all-btn:hover {
+      .fix-all-btn:hover,
+      .rephrase-btn:hover {
         opacity: 1;
         transform: scale(1.1);
       }
-      .fix-all-btn:disabled {
+      .fix-all-btn:disabled,
+      .rephrase-btn:disabled {
         opacity: 0.4;
         cursor: default;
         transform: none;
       }
-      .fix-all-btn svg {
+      .fix-all-btn svg,
+      .rephrase-btn svg {
         width: 12px;
         height: 12px;
+      }
+      .rephrase-btn {
+        background: var(--ac-indigo);
+      }
+      .rephrase-btn.error {
+        background: var(--ac-coral);
+      }
+      .rephrase-btn.loading {
+        opacity: 1;
+        cursor: progress;
+      }
+      .rephrase-btn.loading svg {
+        animation: ac-spin 1s linear infinite;
+      }
+      @keyframes ac-spin {
+        to {
+          transform: rotate(360deg);
+        }
       }
       /* Error count badge on the top-right of the icon */
       .fix-all-count {
@@ -431,7 +465,7 @@ export class UnderlineRenderer {
       }
     `
     this.shadowRoot.appendChild(style)
-    this.createFixAllButton()
+    this.createActionButtons()
 
     document.body.appendChild(this.overlay)
     this.updatePosition()
@@ -732,6 +766,7 @@ export class UnderlineRenderer {
     })
 
     this.updateFixAllButton(activeMatches)
+    this.updateRephraseButton(text)
 
     if (activeMatches.length === 0) {
       this.clearHighlights()
@@ -890,9 +925,44 @@ export class UnderlineRenderer {
     })
   }
 
-  private createFixAllButton(): void {
+  private createActionButtons(): void {
     if (!this.shadowRoot) return
 
+    const container = document.createElement('div')
+    container.className = 'field-actions'
+    this.shadowRoot.appendChild(container)
+
+    this.rephraseButton = this.createRephraseButton()
+    container.appendChild(this.rephraseButton)
+    this.fixAllButton = this.createFixAllButton()
+    container.appendChild(this.fixAllButton)
+  }
+
+  private createRephraseButton(): HTMLButtonElement {
+    const button = document.createElement('button')
+    button.className = 'rephrase-btn'
+    button.type = 'button'
+    button.title = 'Reformuler le texte'
+    button.setAttribute('aria-label', 'Reformuler le texte')
+    // Two curved arrows: the "rewrite" icon
+    button.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"></path><path d="M3 21v-5h5"></path><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"></path><path d="M21 3v5h-5"></path></svg>
+    `
+
+    // Keep focus and selection in the field
+    button.addEventListener('mousedown', (e) => e.preventDefault())
+    button.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (this.rephraseLoading) return
+      this.hideTooltip()
+      this.callbacks?.onRephrase?.()
+    })
+
+    return button
+  }
+
+  private createFixAllButton(): HTMLButtonElement {
     const button = document.createElement('button')
     button.className = 'fix-all-btn'
     button.type = 'button'
@@ -908,8 +978,34 @@ export class UnderlineRenderer {
       this.callbacks?.onFixAll?.(this.fixableMatches)
     })
 
-    this.shadowRoot.appendChild(button)
-    this.fixAllButton = button
+    return button
+  }
+
+  /** Show the rephrase icon only when a rephrase server is configured */
+  setRephraseEnabled(enabled: boolean): void {
+    this.rephraseEnabled = enabled
+    if (!enabled) this.rephraseButton?.classList.remove('visible')
+  }
+
+  setRephraseLoading(loading: boolean, error?: string): void {
+    if (!this.rephraseButton) return
+    this.rephraseLoading = loading
+    this.rephraseButton.classList.toggle('loading', loading)
+    this.rephraseButton.classList.toggle('error', Boolean(error))
+    const label = loading
+      ? 'Reformulation en cours...'
+      : error
+        ? `Reformulation impossible : ${error}`
+        : 'Reformuler le texte'
+    this.rephraseButton.title = label
+    this.rephraseButton.setAttribute('aria-label', label)
+  }
+
+  private updateRephraseButton(text: string): void {
+    if (!this.rephraseButton) return
+    const visible =
+      this.rephraseEnabled && (this.rephraseLoading || text.trim().length >= REPHRASE_MIN_LENGTH)
+    this.rephraseButton.classList.toggle('visible', visible)
   }
 
   private updateFixAllButton(activeMatches: LanguageToolMatch[]): void {
