@@ -224,10 +224,10 @@ Any server that speaks the LanguageTool HTTP API (`/v2/check`, `/v2/languages`) 
 
 LanguageTool has no rephrase endpoint, so rephrasing goes to a separate server that speaks the OpenAI chat API (`/v1/chat/completions`). The extension sends the whole field (up to 3,000 characters) and replaces it with the answer.
 
-A small model on CPU is enough. Example with the [llama.cpp server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server) Docker image `ghcr.io/ggml-org/llama.cpp:server`, configured with environment variables:
+A small model on CPU is enough: Qwen3 4B Instruct answers in 1 to 3 seconds per sentence on 8 vCPU. Models under 2B parameters change the meaning or add details. Example with the [llama.cpp server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server) Docker image `ghcr.io/ggml-org/llama.cpp:server`, configured with environment variables:
 
 ```
-LLAMA_ARG_HF_REPO=Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q4_K_M
+LLAMA_ARG_HF_REPO=unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M
 LLAMA_ARG_PORT=8080
 LLAMA_ARG_CTX_SIZE=4096
 LLAMA_ARG_THREADS=8          # match the container's vCPU limit
